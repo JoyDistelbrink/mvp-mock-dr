@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+jinja2
+azure-identity
+azure-keyvault-secrets
+azure-storage-blob
+psycopg2-binary
+python-dotenv
