@@ -3,7 +3,12 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
-from services.azure_clients import check_postgres, check_storage, check_keyvault
+from services.azure_clients import (
+    check_postgres,
+    check_storage,
+    check_keyvault,
+    check_vm,
+)
 
 # Load environment variables
 load_dotenv()
@@ -17,11 +22,21 @@ templates = Jinja2Templates(directory="templates")
 KV_URL = os.getenv("AZURE_KEYVAULT_URL")
 STORAGE_URL = os.getenv("AZURE_STORAGE_ACCOUNT_URL")
 PG_CONN_STR = os.getenv("POSTGRES_CONNECTION_STRING")
+CHECK_VM = os.getenv("CHECK_VM", "false").lower() == "true"
+VM_HOST = os.getenv("AZURE_VM_HOST")
 
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/api/settings")
+def get_settings():
+    """
+    Returns current application settings.
+    """
+    return {"check_vm": CHECK_VM, "vm_host": VM_HOST}
 
 
 @app.get("/api/health")
@@ -57,16 +72,34 @@ def health_check():
         }
     )
 
+    vm_result = None
+    if CHECK_VM and VM_HOST:
+        vm_result = check_vm(VM_HOST)
+    elif CHECK_VM and not VM_HOST:
+        vm_result = {
+            "status": "unknown",
+            "message": "Host not configured",
+            "resource_name": "Not configured",
+        }
+
     # Determine overall app health
     all_results = [postgres_result, storage_result, keyvault_result]
+    if vm_result:
+        all_results.append(vm_result)
+
     all_up = all(r["status"] == "up" for r in all_results if r["status"] != "unknown")
 
-    return {
+    response = {
         "postgres": postgres_result,
         "storage": storage_result,
         "keyvault": keyvault_result,
         "overall": "healthy" if all_up else "degraded",
     }
+
+    if vm_result:
+        response["vm"] = vm_result
+
+    return response
 
 
 @app.get("/api/resources")
@@ -111,6 +144,16 @@ def get_resources():
         match = re.search(r"https://([^.]+)\.vault\.azure\.net", KV_URL)
         kv_name = match.group(1) if match else KV_URL
     resources.append({"type": "keyvault", "name": kv_name, "configured": kv_configured})
+
+    # VM
+    if CHECK_VM:
+        resources.append(
+            {
+                "type": "vm",
+                "name": VM_HOST or "Not configured",
+                "configured": bool(VM_HOST),
+            }
+        )
 
     return resources
 

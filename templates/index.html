@@ -86,6 +86,52 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 z-50 hidden">
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm" onclick="closeSettingsModal()"></div>
+        <div class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md">
+            <div class="bg-white rounded-lg shadow-lg border mx-4">
+                <div class="flex items-center justify-between p-4 border-b">
+                    <h3 class="text-sm font-semibold text-gray-900">Settings</h3>
+                    <button onclick="closeSettingsModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-900">VM Monitoring</h4>
+                            <p class="text-xs text-gray-500">Enable monitoring for Virtual Machine</p>
+                        </div>
+                        <div class="flex items-center">
+                            <span id="setting-check-vm"
+                                class="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                                Disabled
+                            </span>
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t">
+                        <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Configuration</h4>
+                        <dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                            <div class="sm:col-span-2">
+                                <dt class="text-xs font-medium text-gray-500">VM Host</dt>
+                                <dd class="mt-1 text-sm text-gray-900 font-mono bg-gray-50 p-2 rounded border"
+                                    id="setting-vm-host">--</dd>
+                            </div>
+                        </dl>
+                    </div>
+                </div>
+                <div class="p-4 border-t bg-gray-50 rounded-b-lg">
+                    <button onclick="closeSettingsModal()"
+                        class="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="flex h-screen overflow-hidden">
 
         <!-- Sidebar -->
@@ -103,7 +149,7 @@
                     </svg>
                     Dashboard
                 </a>
-                <a href="#"
+                <a href="#" onclick="openSettingsModal(); return false;"
                     class="flex items-center rounded-lg px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900">
                     <svg class="mr-3 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -183,7 +229,11 @@
                     <div class="rounded-xl border bg-white shadow-sm flex flex-col">
                         <div class="p-6 pb-4">
                             <div class="flex items-center justify-between">
-                                <h3 class="text-sm font-medium text-gray-500">Database (PostgreSQL)</h3>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-medium text-gray-500">Database (PostgreSQL)</h3>
+                                    <span id="postgres-region-badge"
+                                        class="hidden inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-inset ring-blue-600/10 tracking-wide"></span>
+                                </div>
                                 <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor"
                                     viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -204,7 +254,11 @@
                     <div class="rounded-xl border bg-white shadow-sm flex flex-col">
                         <div class="p-6 pb-4">
                             <div class="flex items-center justify-between">
-                                <h3 class="text-sm font-medium text-gray-500">Blob Storage</h3>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-medium text-gray-500">Blob Storage</h3>
+                                    <span id="storage-region-badge"
+                                        class="hidden inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-inset ring-blue-600/10 tracking-wide"></span>
+                                </div>
                                 <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor"
                                     viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -225,7 +279,11 @@
                     <div class="rounded-xl border bg-white shadow-sm flex flex-col">
                         <div class="p-6 pb-4">
                             <div class="flex items-center justify-between">
-                                <h3 class="text-sm font-medium text-gray-500">Key Vault</h3>
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-medium text-gray-500">Key Vault</h3>
+                                    <span id="keyvault-region-badge"
+                                        class="hidden inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-inset ring-blue-600/10 tracking-wide"></span>
+                                </div>
                                 <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor"
                                     viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -240,6 +298,31 @@
                             <p class="mt-1 text-sm text-gray-500" id="keyvault-latency">Latency: -- ms</p>
                         </div>
                         <div id="keyvault-heartbeat" class="mt-auto px-6 pb-4 flex gap-[2px] overflow-hidden"></div>
+                    </div>
+
+                    <!-- VM Card (Hidden by default) -->
+                    <div id="vm-card" class="rounded-xl border bg-white shadow-sm flex flex-col hidden">
+                        <div class="p-6 pb-4">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <h3 class="text-sm font-medium text-gray-500">Virtual Machine</h3>
+                                    <span id="vm-region-badge"
+                                        class="hidden inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-inset ring-blue-600/10 tracking-wide"></span>
+                                </div>
+                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor"
+                                    viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01">
+                                    </path>
+                                </svg>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-400 font-mono truncate" id="vm-resource">--</p>
+                            <div class="mt-3 flex items-baseline">
+                                <p class="text-2xl font-semibold text-gray-900" id="vm-status">Checking...</p>
+                            </div>
+                            <p class="mt-1 text-sm text-gray-500" id="vm-latency">Latency: -- ms</p>
+                        </div>
+                        <div id="vm-heartbeat" class="mt-auto px-6 pb-4 flex gap-[2px] overflow-hidden"></div>
                     </div>
                 </div>
 
@@ -266,12 +349,14 @@
         const history = {
             postgres: [],
             storage: [],
-            keyvault: []
+            keyvault: [],
+            vm: []
         };
 
         // Initialize heartbeat slots (empty placeholders)
         function initHeartbeat(containerId) {
             const container = document.getElementById(containerId);
+            if (!container) return;
             container.innerHTML = '';
             for (let i = 0; i < SLOT_COUNT; i++) {
                 const slot = document.createElement('div');
@@ -283,6 +368,7 @@
         // Update heartbeat display
         function updateHeartbeat(containerId, historyArray) {
             const container = document.getElementById(containerId);
+            if (!container) return;
             const slots = container.children;
             for (let i = 0; i < SLOT_COUNT; i++) {
                 if (i < historyArray.length) {
@@ -304,6 +390,7 @@
         initHeartbeat('postgres-heartbeat');
         initHeartbeat('storage-heartbeat');
         initHeartbeat('keyvault-heartbeat');
+        initHeartbeat('vm-heartbeat');
 
         async function updateStatus() {
             try {
@@ -312,6 +399,8 @@
 
                 // Helper to update UI elements
                 const updateCard = (service, elementIdPrefix) => {
+                    if (!service) return; // Skip if service data is missing
+
                     const statusEl = document.getElementById(`${ elementIdPrefix }-status`);
                     const latencyEl = document.getElementById(`${ elementIdPrefix }-latency`);
                     const resourceEl = document.getElementById(`${ elementIdPrefix }-resource`);
@@ -320,6 +409,17 @@
                     if (resourceEl) {
                         resourceEl.textContent = service.resource_name || '--';
                         resourceEl.title = service.resource_name || '';
+                    }
+
+                    // Update region badge if available
+                    const regionBadge = document.getElementById(`${ elementIdPrefix }-region-badge`);
+                    if (regionBadge) {
+                        if (service.region && service.region !== 'Unknown') {
+                            regionBadge.textContent = service.region;
+                            regionBadge.classList.remove('hidden');
+                        } else {
+                            regionBadge.classList.add('hidden');
+                        }
                     }
 
                     // Determine status type
@@ -374,6 +474,15 @@
                 updateCard(data.storage, 'storage');
                 updateCard(data.keyvault, 'keyvault');
 
+                // Handle VM card visibility and update
+                const vmCard = document.getElementById('vm-card');
+                if (data.vm) {
+                    vmCard.classList.remove('hidden');
+                    updateCard(data.vm, 'vm');
+                } else {
+                    vmCard.classList.add('hidden');
+                }
+
                 // Update Overall App Status Badge
                 const badge = document.getElementById('app-status-badge');
                 if (data.overall === 'healthy') {
@@ -394,8 +503,11 @@
 
                 // Helper to set error state
                 const setError = (elementIdPrefix) => {
-                    document.getElementById(`${ elementIdPrefix }-status`).textContent = 'Connection Failed';
-                    document.getElementById(`${ elementIdPrefix }-status`).className = 'text-2xl font-semibold text-red-600';
+                    const statusEl = document.getElementById(`${ elementIdPrefix }-status`);
+                    if (!statusEl) return; // Skip if element doesn't exist (e.g. hidden VM card)
+
+                    statusEl.textContent = 'Connection Failed';
+                    statusEl.className = 'text-2xl font-semibold text-red-600';
                     document.getElementById(`${ elementIdPrefix }-latency`).textContent = 'Check backend logs';
 
                     // Reset history when full, then add failure
@@ -409,6 +521,10 @@
                 setError('postgres');
                 setError('storage');
                 setError('keyvault');
+                // Only set error for VM if it was previously visible/configured
+                if (!document.getElementById('vm-card').classList.contains('hidden')) {
+                    setError('vm');
+                }
             }
         }
 
@@ -501,8 +617,43 @@
 
         // Close modal on Escape key
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeErrorModal();
+            if (e.key === 'Escape') {
+                closeErrorModal();
+                closeSettingsModal();
+            }
         });
+
+        // Settings Modal Functions
+        async function openSettingsModal() {
+            const modal = document.getElementById('settings-modal');
+            const checkVmBadge = document.getElementById('setting-check-vm');
+            const vmHostEl = document.getElementById('setting-vm-host');
+
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+
+                if (settings.check_vm) {
+                    checkVmBadge.textContent = 'Enabled';
+                    checkVmBadge.className = 'inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700';
+                } else {
+                    checkVmBadge.textContent = 'Disabled';
+                    checkVmBadge.className = 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800';
+                }
+
+                vmHostEl.textContent = settings.vm_host || 'Not configured';
+
+            } catch (error) {
+                console.error('Failed to load settings', error);
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.add('hidden');
+        }
 
         // Fetch and render Azure resources list
         async function loadResources() {
@@ -519,13 +670,15 @@
                 const typeIcons = {
                     postgres: `<svg class="h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>`,
                     storage: `<svg class="h-5 w-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>`,
-                    keyvault: `<svg class="h-5 w-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>`
+                    keyvault: `<svg class="h-5 w-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>`,
+                    vm: `<svg class="h-5 w-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>`
                 };
 
                 const typeLabels = {
                     postgres: 'PostgreSQL',
                     storage: 'Blob Storage',
-                    keyvault: 'Key Vault'
+                    keyvault: 'Key Vault',
+                    vm: 'Virtual Machine'
                 };
 
                 container.innerHTML = resources.map(r => `
