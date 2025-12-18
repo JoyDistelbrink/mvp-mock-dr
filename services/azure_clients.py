@@ -10,7 +10,10 @@ from azure.keyvault.secrets import SecretClient
 from azure.storage.blob import BlobServiceClient
 from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.subscription import SubscriptionClient
+from azure.mgmt.compute import ComputeManagementClient
+from azure.mgmt.network import NetworkManagementClient
 import psycopg2
+from ping3 import ping
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -98,7 +101,7 @@ _cached_keyvault_client = None
 _cached_region = {}
 
 
-def get_azure_region(resource_name: str, resource_type: str = None) -> str:
+def get_azure_region(resource_name: str, resource_type: str | None = None) -> str:
     """
     Dynamically fetches the Azure region for a resource using the Management SDK.
     """
@@ -134,6 +137,9 @@ def get_azure_region(resource_name: str, resource_type: str = None) -> str:
         if resources:
             # Azure returns region like 'switzerlandnorth', we format it nicely
             raw_region = resources[0].location
+            if not raw_region:
+                return "Unknown"
+
             # Simple formatting: 'switzerlandnorth' -> 'Switzerland North'
             # This is a heuristic, for perfect mapping we'd need a lookup table
             formatted_region = raw_region.title()
@@ -265,45 +271,126 @@ def check_keyvault(vault_url: str):
         }
 
 
-def check_vm(host: str):
+def resolve_vm_details(resource_id: str) -> tuple[str, str, str]:
     """
-    Checks connectivity to a VM using ICMP ping.
+    Resolves VM private IP and region from a Resource ID.
     """
-    import subprocess
-    import platform
-
-    start_time = time.time()
     try:
-        # Determine ping command based on OS
-        param = "-n" if platform.system().lower() == "windows" else "-c"
-        command = ["ping", param, "1", host]
+        # Parse Resource ID
+        # /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Compute/virtualMachines/{vm}
+        parts = resource_id.split("/")
+        if len(parts) < 9:
+            raise ValueError("Invalid Resource ID format")
 
-        # Run ping command
-        result = subprocess.run(
-            command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=2
-        )
+        subscription_id = parts[2]
+        resource_group = parts[4]
+        vm_name = parts[8]
 
-        if result.returncode == 0:
-            latency = (time.time() - start_time) * 1000
+        credential = get_credential()
 
-            # Try to fetch region if it looks like an Azure resource name (not an IP)
+        # Get VM details
+        compute_client = ComputeManagementClient(credential, subscription_id)
+        vm = compute_client.virtual_machines.get(resource_group, vm_name)
+
+        # Get Region
+        raw_region = vm.location
+        if not raw_region:
             region = "Unknown"
-            if not host.replace(".", "").isdigit():
+        else:
+            formatted_region = raw_region.title()
+            if "north" in raw_region:
+                formatted_region = formatted_region.replace("north", " North")
+            if "west" in raw_region:
+                formatted_region = formatted_region.replace("west", " West")
+            if "east" in raw_region:
+                formatted_region = formatted_region.replace("east", " East")
+            if "south" in raw_region:
+                formatted_region = formatted_region.replace("south", " South")
+            if "central" in raw_region:
+                formatted_region = formatted_region.replace("central", " Central")
+            region = formatted_region.strip()
+
+        # Get Network Interface
+        profile = vm.network_profile
+        if not profile or not profile.network_interfaces:
+            raise ValueError("VM has no network interfaces")
+
+        nic_id = profile.network_interfaces[0].id
+        if not nic_id:
+            raise ValueError("NIC ID is missing")
+        nic_name = nic_id.split("/")[-1]
+
+        network_client = NetworkManagementClient(credential, subscription_id)
+        nic = network_client.network_interfaces.get(resource_group, nic_name)
+
+        if not nic.ip_configurations:
+            raise ValueError("NIC has no IP configurations")
+
+        private_ip = nic.ip_configurations[0].private_ip_address
+        if not private_ip:
+            raise ValueError("NIC has no private IP")
+
+        return private_ip, region, vm_name
+
+    except Exception as e:
+        logger.error(f"Failed to resolve VM details: {e}")
+        raise
+
+
+def check_vm(resource_id_or_host: str):
+    """
+    Checks connectivity to a VM using ICMP ping via ping3.
+    Accepts either a hostname/IP or an Azure Resource ID.
+    """
+    start_time = time.time()
+    host = resource_id_or_host
+    region = "Unknown"
+    display_name = resource_id_or_host
+
+    try:
+        # If it looks like a Resource ID, resolve it
+        if resource_id_or_host.startswith("/subscriptions/"):
+            try:
+                host, region, display_name = resolve_vm_details(resource_id_or_host)
+            except Exception as e:
+                return {
+                    "status": "down",
+                    "latency_ms": 0,
+                    "message": f"Resolution failed: {str(e)}",
+                    "resource_name": (
+                        resource_id_or_host.split("/")[-1]
+                        if "/" in resource_id_or_host
+                        else resource_id_or_host
+                    ),
+                }
+
+        # ping returns delay in seconds, or None on timeout, or False on error
+        delay_s = ping(host, timeout=2)
+
+        if delay_s is not None and delay_s is not False:
+            latency_ms = delay_s * 1000
+
+            # Try to fetch region if it looks like an Azure resource name (not an IP) and we haven't already
+            if (
+                region == "Unknown"
+                and not host.replace(".", "").isdigit()
+                and not host[0].isdigit()
+            ):
                 region = get_azure_region(host, "Microsoft.Compute/virtualMachines")
 
             return {
                 "status": "up",
-                "latency_ms": round(latency, 2),
+                "latency_ms": round(latency_ms, 2),
                 "message": "Connected",
-                "resource_name": host,
+                "resource_name": display_name,
                 "region": region,
             }
         else:
             return {
                 "status": "down",
                 "latency_ms": 0,
-                "message": "Ping failed",
-                "resource_name": host,
+                "message": "Request timed out" if delay_s is None else "Ping failed",
+                "resource_name": display_name,
             }
     except Exception as e:
         logger.error(f"VM check failed: {str(e)}")
@@ -311,5 +398,5 @@ def check_vm(host: str):
             "status": "down",
             "latency_ms": 0,
             "message": str(e),
-            "resource_name": host,
+            "resource_name": display_name,
         }

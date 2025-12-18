@@ -6,5 +6,8 @@ azure-keyvault-secrets
 azure-storage-blob
 azure-mgmt-resource
 azure-mgmt-subscription
+azure-mgmt-compute
+azure-mgmt-network
 psycopg2-binary
 python-dotenv
+ping3

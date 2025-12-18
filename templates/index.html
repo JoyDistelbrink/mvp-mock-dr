@@ -641,7 +641,13 @@
                     checkVmBadge.className = 'inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800';
                 }
 
-                vmHostEl.textContent = settings.vm_host || 'Not configured';
+                let displayHost = settings.vm_host || 'Not configured';
+                if (displayHost.startsWith('/subscriptions/')) {
+                    const parts = displayHost.split('/');
+                    displayHost = parts[parts.length - 1];
+                }
+                vmHostEl.textContent = displayHost;
+                vmHostEl.title = settings.vm_host || '';
 
             } catch (error) {
                 console.error('Failed to load settings', error);

@@ -147,10 +147,15 @@ def get_resources():
 
     # VM
     if CHECK_VM:
+        vm_name = VM_HOST or "Not configured"
+        if vm_name.startswith("/subscriptions/"):
+            # Extract just the VM name from the Resource ID
+            vm_name = vm_name.split("/")[-1]
+
         resources.append(
             {
                 "type": "vm",
-                "name": VM_HOST or "Not configured",
+                "name": vm_name,
                 "configured": bool(VM_HOST),
             }
         )
