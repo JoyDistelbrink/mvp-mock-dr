@@ -417,6 +417,15 @@
                         if (service.region && service.region !== 'Unknown') {
                             regionBadge.textContent = service.region;
                             regionBadge.classList.remove('hidden');
+                            // Reset styles
+                            regionBadge.className = 'inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-600 ring-1 ring-inset ring-blue-600/10 tracking-wide';
+                            regionBadge.onclick = null;
+                        } else if (service.region === 'Unknown' && service.region_error) {
+                            regionBadge.textContent = 'Unknown';
+                            regionBadge.classList.remove('hidden');
+                            // Error style
+                            regionBadge.className = 'inline-flex items-center rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600 ring-1 ring-inset ring-red-600/10 tracking-wide cursor-pointer hover:bg-red-100';
+                            regionBadge.onclick = () => showErrorModal(`${ service.resource_name || elementIdPrefix } Region Error`, service.region_error);
                         } else {
                             regionBadge.classList.add('hidden');
                         }
@@ -592,7 +601,7 @@
         startPolling();
 
         // Modal functions
-        function showErrorModal(service) {
+        function showErrorModal(service, explicitMessage = null) {
             const modal = document.getElementById('error-modal');
             const title = document.getElementById('modal-title');
             const content = document.getElementById('modal-content');
@@ -600,11 +609,17 @@
             const serviceNames = {
                 postgres: 'Database (PostgreSQL)',
                 storage: 'Blob Storage',
-                keyvault: 'Key Vault'
+                keyvault: 'Key Vault',
+                vm: 'Virtual Machine'
             };
 
-            title.textContent = `${ serviceNames[service] || service } - Error Details`;
-            content.textContent = window.errorMessages?.[service] || 'No error details available';
+            if (explicitMessage) {
+                title.textContent = service; // Use first arg as title
+                content.textContent = explicitMessage;
+            } else {
+                title.textContent = `${ serviceNames[service] || service } - Error Details`;
+                content.textContent = window.errorMessages?.[service] || 'No error details available';
+            }
             modal.classList.remove('hidden');
             document.body.style.overflow = 'hidden';
         }

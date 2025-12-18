@@ -71,12 +71,12 @@ def check_postgres(connection_string: str):
 
         # Extract simple name for Azure lookup (e.g. 'ubsmock' from 'ubsmock.postgres.database.azure.com')
         simple_name = resource_name.split(".")[0]
-        region = get_azure_region(
+        region, region_error = get_azure_region(
             simple_name, "Microsoft.DBforPostgreSQL/flexibleServers"
         )
         if region == "Unknown":
             # Fallback to searching by name only if type mismatch
-            region = get_azure_region(simple_name)
+            region, region_error = get_azure_region(simple_name)
 
         return {
             "status": "up",
@@ -84,6 +84,7 @@ def check_postgres(connection_string: str):
             "message": "Connected",
             "resource_name": resource_name,
             "region": region,
+            "region_error": region_error,
         }
     except Exception as e:
         logger.error(f"Postgres check failed: {str(e)}")
@@ -101,13 +102,16 @@ _cached_keyvault_client = None
 _cached_region = {}
 
 
-def get_azure_region(resource_name: str, resource_type: str | None = None) -> str:
+def get_azure_region(
+    resource_name: str, resource_type: str | None = None
+) -> tuple[str, str | None]:
     """
     Dynamically fetches the Azure region for a resource using the Management SDK.
+    Returns a tuple of (region, error_message).
     """
     cache_key = f"{resource_name}:{resource_type}" if resource_type else resource_name
     if cache_key in _cached_region:
-        return _cached_region[cache_key]
+        return _cached_region[cache_key], None
 
     try:
         credential = get_credential()
@@ -123,7 +127,7 @@ def get_azure_region(resource_name: str, resource_type: str | None = None) -> st
 
         if not subscription_id:
             logger.warning("No subscription ID found, cannot fetch region.")
-            return "Unknown"
+            return "Unknown", "No subscription ID found"
 
         # 2. Find the resource
         resource_client = ResourceManagementClient(credential, subscription_id)
@@ -138,7 +142,7 @@ def get_azure_region(resource_name: str, resource_type: str | None = None) -> st
             # Azure returns region like 'switzerlandnorth', we format it nicely
             raw_region = resources[0].location
             if not raw_region:
-                return "Unknown"
+                return "Unknown", "Region property is empty"
 
             # Simple formatting: 'switzerlandnorth' -> 'Switzerland North'
             # This is a heuristic, for perfect mapping we'd need a lookup table
@@ -156,12 +160,13 @@ def get_azure_region(resource_name: str, resource_type: str | None = None) -> st
                 formatted_region = formatted_region.replace("central", " Central")
 
             _cached_region[cache_key] = formatted_region.strip()
-            return _cached_region[cache_key]
+            return _cached_region[cache_key], None
+
+        return "Unknown", "Resource not found"
 
     except Exception as e:
         logger.warning(f"Failed to fetch region for {resource_name}: {e}")
-
-    return "Unknown"
+        return "Unknown", str(e)
 
 
 def extract_storage_account_name(account_url: str) -> str:
@@ -199,7 +204,9 @@ def check_storage(account_url: str):
         latency = (time.time() - start_time) * 1000
 
         # Dynamically fetch region
-        region = get_azure_region(resource_name, "Microsoft.Storage/storageAccounts")
+        region, region_error = get_azure_region(
+            resource_name, "Microsoft.Storage/storageAccounts"
+        )
 
         return {
             "status": "up",
@@ -207,6 +214,7 @@ def check_storage(account_url: str):
             "message": "Connected",
             "resource_name": resource_name,
             "region": region,
+            "region_error": region_error,
             "sku": info.get("sku_name"),
             "kind": info.get("account_kind"),
         }
@@ -252,7 +260,9 @@ def check_keyvault(vault_url: str):
             break
         latency = (time.time() - start_time) * 1000
 
-        region = get_azure_region(resource_name, "Microsoft.KeyVault/vaults")
+        region, region_error = get_azure_region(
+            resource_name, "Microsoft.KeyVault/vaults"
+        )
 
         return {
             "status": "up",
@@ -260,6 +270,7 @@ def check_keyvault(vault_url: str):
             "message": "Connected",
             "resource_name": resource_name,
             "region": region,
+            "region_error": region_error,
         }
     except Exception as e:
         logger.error(f"Key Vault check failed: {str(e)}")
@@ -345,6 +356,7 @@ def check_vm(resource_id_or_host: str):
     start_time = time.time()
     host = resource_id_or_host
     region = "Unknown"
+    region_error = None
     display_name = resource_id_or_host
 
     try:
@@ -362,7 +374,19 @@ def check_vm(resource_id_or_host: str):
                         if "/" in resource_id_or_host
                         else resource_id_or_host
                     ),
+                    "region": "Unknown",
+                    "region_error": str(e),
                 }
+
+        # Try to fetch region if it looks like an Azure resource name (not an IP) and we haven't already
+        if (
+            region == "Unknown"
+            and not host.replace(".", "").isdigit()
+            and not host[0].isdigit()
+        ):
+            region, region_error = get_azure_region(
+                host, "Microsoft.Compute/virtualMachines"
+            )
 
         # ping returns delay in seconds, or None on timeout, or False on error
         delay_s = ping(host, timeout=2)
@@ -370,20 +394,13 @@ def check_vm(resource_id_or_host: str):
         if delay_s is not None and delay_s is not False:
             latency_ms = delay_s * 1000
 
-            # Try to fetch region if it looks like an Azure resource name (not an IP) and we haven't already
-            if (
-                region == "Unknown"
-                and not host.replace(".", "").isdigit()
-                and not host[0].isdigit()
-            ):
-                region = get_azure_region(host, "Microsoft.Compute/virtualMachines")
-
             return {
                 "status": "up",
                 "latency_ms": round(latency_ms, 2),
                 "message": "Connected",
                 "resource_name": display_name,
                 "region": region,
+                "region_error": region_error,
             }
         else:
             return {
@@ -391,6 +408,8 @@ def check_vm(resource_id_or_host: str):
                 "latency_ms": 0,
                 "message": "Request timed out" if delay_s is None else "Ping failed",
                 "resource_name": display_name,
+                "region": region,
+                "region_error": region_error,
             }
     except Exception as e:
         logger.error(f"VM check failed: {str(e)}")
@@ -399,4 +418,6 @@ def check_vm(resource_id_or_host: str):
             "latency_ms": 0,
             "message": str(e),
             "resource_name": display_name,
+            "region": region,
+            "region_error": region_error or str(e),
         }
